@@ -1,5 +1,5 @@
 # Simple-Adblock-Tool
-This script is responsible for creating a simple adblock mechanism. It rejects connections from specific domain names or IP addresses using iptables.
+This script is responsible for creating a simple adblock mechanism. It rejects connections from specific domain names or IP (both IPV4 and IPV6) addresses using iptables and ip6tables.
 
 ## Prerequisites
 
@@ -10,6 +10,7 @@ The script must be run as root.
 - `domainNames.txt`: This file should contain the domain names to be blocked.
 - `IPAddresses.txt`: This file should contain the IP addresses to be blocked.
 - `adblockRules`: This file will contain the saved iptables rules.
+- `adblockRulesIPv6`: This file will contain the saved ip6tables rules.
 
 These files should be created with these exact names.
 
