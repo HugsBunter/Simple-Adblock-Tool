@@ -3,6 +3,7 @@
 domainNames="domainNames.txt"
 IPAddresses="IPAddresses.txt"
 adblockRules="adblockRules"
+adblockRulesIPv6="adblockRulesIPv6"
 
 function adBlock() {
     if [ "$EUID" -ne 0 ];then
@@ -16,11 +17,21 @@ function adBlock() {
 
         while read -r line; do
             ip_address=$(nslookup "$line" | sed -n '6p' | awk '/Address:/{print $2}')
-            if [[ -z "$ip_address" ]]; then #check if the ip address is null
+            if [[ -z "$ip_address" ]]; then
                 echo "Unreachable site: $line"
             else
-                echo "$ip_address" >> $IPAddresses #The ip of each domain name is saved in IPAddresses.txt
-                iptables -C INPUT -s "$ip_address" -j REJECT || iptables -A INPUT -s "$ip_address" -j REJECT
+                echo "$ip_address" >> $IPAddresses
+
+                if [[ $ip_address =~ ^(([1-9]?[0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}([1-9]?[0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])$ ]]; then
+                    echo "$ip_address is IPv4"
+                    iptables -C INPUT -s "$ip_address" -j REJECT || iptables -A INPUT -s "$ip_address" -j REJECT
+                elif [[ $ip_address =~ ^(([0-9a-fA-F]{1,4}):){7}([0-9a-fA-F]{1,4})$ ]]; then
+                    echo "$ip_address is IPv6"
+                    ip6tables -C INPUT -s "$ip_address" -j REJECT || ip6tables -A INPUT -s "$ip_address" -j REJECT
+                else
+                    echo "$ip_address is not a valid IP address"
+                fi
+
             fi
             done < $domainNames
                         
@@ -35,7 +46,15 @@ function adBlock() {
 
         while read -r line; do
 
-            iptables -C INPUT -s "$line" -j REJECT || iptables -A INPUT -s "$line" -j REJECT
+            if [[ $line =~ ^(([1-9]?[0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}([1-9]?[0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])$ ]]; then
+                echo "$line is IPv4"
+                iptables -C INPUT -s "$line" -j REJECT || iptables -A INPUT -s "$line" -j REJECT
+            elif [[ $line =~ ^(([0-9a-fA-F]{1,4}):){7}([0-9a-fA-F]{1,4})$ ]]; then
+                echo "$line is IPv6"
+                ip6tables -C INPUT -s "$line" -j REJECT || ip6tables -A INPUT -s "$line" -j REJECT
+            else
+                echo "$line is not a valid IP address"
+            fi
 
         done < $IPAddresses
         
@@ -47,6 +66,7 @@ function adBlock() {
         # Save rules to $adblockRules file.
           
         iptables-save >> $adblockRules
+        ip6tables-save >> $adblockRulesIPv6
 
         true
         
@@ -54,6 +74,7 @@ function adBlock() {
         # Load rules from $adblockRules file.
         
         iptables-restore < $adblockRules
+        ip6tables-restore <$adblockRulesIPv6
 
         true
         
@@ -65,12 +86,18 @@ function adBlock() {
         iptables -P FORWARD ACCEPT
         iptables -P OUTPUT ACCEPT
 
+        ip6tables -F
+        ip6tables -P INPUT ACCEPT
+        ip6tables -P FORWARD ACCEPT
+        ip6tables -P OUTPUT ACCEPT
+
         true
         
     elif [ "$1" = "-list"  ]; then
         # List current rules.
        
         iptables -L -v -n --line-numbers
+        ip6tables -L -v -n --line-numbers
 
         true
         
